@@ -83,7 +83,7 @@ trait StandardCachingActorHelper extends JobCachingActorHelper {
       else
         jobPaths.metadataPaths
 
-    runtimeAttributesMetadata ++ fileMetadata ++ nonStandardMetadata
+    nonStandardMetadata ++ runtimeAttributesMetadata ++ fileMetadata
   }
 
   /**
