@@ -62,8 +62,8 @@ class BlobPathBuilderSpec extends AnyFlatSpec with Matchers with MockSugar {
     val endpointHost = BlobPathBuilder.parseURI(endpoint.value).map(_.getHost).getOrElse(fail("Could not parse URI"))
     val store = BlobContainerName("inputs")
     val evalPath = "/test/inputFile.txt"
-    val blobTokenGenerator = NativeBlobTokenGenerator(store, endpoint)
-    val fsm: BlobFileSystemManager = BlobFileSystemManager(store, endpoint, 10L, blobTokenGenerator)
+    val blobTokenGenerator = NativeBlobSasTokenGenerator(store, endpoint)
+    val fsm: BlobFileSystemManager = new BlobFileSystemManager(store, endpoint, 10L, blobTokenGenerator)
     val testString = endpoint.value + "/" + store + evalPath
     val blobPath: BlobPath = new BlobPathBuilder(store, endpoint)(fsm) build testString getOrElse fail()
 
@@ -80,8 +80,8 @@ class BlobPathBuilderSpec extends AnyFlatSpec with Matchers with MockSugar {
     val endpoint = BlobPathBuilderSpec.buildEndpoint("coaexternalstorage")
     val store = BlobContainerName("inputs")
     val evalPath = "/test/inputFile.txt"
-    val blobTokenGenerator = NativeBlobTokenGenerator(store, endpoint)
-    val fsm: BlobFileSystemManager = BlobFileSystemManager(store, endpoint, 10, blobTokenGenerator)
+    val blobTokenGenerator = NativeBlobSasTokenGenerator(store, endpoint)
+    val fsm: BlobFileSystemManager = new BlobFileSystemManager(store, endpoint, 10, blobTokenGenerator)
     val testString = endpoint.value + "/" + store + evalPath
     val blobPath1: BlobPath = new BlobPathBuilder(store, endpoint)(fsm) build testString getOrElse fail()
     blobPath1.nioPath.getFileSystem.close()
@@ -90,5 +90,18 @@ class BlobPathBuilderSpec extends AnyFlatSpec with Matchers with MockSugar {
     val is = blobPath1.newInputStream()
     val fileText = (is.readAllBytes.map(_.toChar)).mkString
     fileText should include ("This is my test file!!!! Did it work?")
+  }
+
+  ignore should "resolve a path without duplicating container name" in {
+    val endpoint = BlobPathBuilderSpec.buildEndpoint("coaexternalstorage")
+    val store = BlobContainerName("inputs")
+    val blobTokenGenerator = NativeBlobSasTokenGenerator(store, endpoint)
+    val fsm: BlobFileSystemManager = new BlobFileSystemManager(store, endpoint, 10, blobTokenGenerator)
+
+    val rootString = s"${endpoint.value}/${store.value}/cromwell-execution"
+    val blobRoot: BlobPath = new BlobPathBuilder(store, endpoint)(fsm) build rootString getOrElse fail()
+    blobRoot.toAbsolutePath.pathAsString should equal ("https://coaexternalstorage.blob.core.windows.net/inputs/cromwell-execution")
+    val otherFile = blobRoot.resolve("test/inputFile.txt")
+    otherFile.toAbsolutePath.pathAsString should equal ("https://coaexternalstorage.blob.core.windows.net/inputs/cromwell-execution/test/inputFile.txt")
   }
 }
